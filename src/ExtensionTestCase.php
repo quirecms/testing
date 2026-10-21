@@ -1,0 +1,169 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Quire\Testing;
+
+use Doctrine\DBAL\Connection;
+use Quire\Extension\ExtensionManager;
+use Quire\Settings\Settings;
+use Symfony\Bundle\FrameworkBundle\Console\Application;
+use Symfony\Bundle\FrameworkBundle\KernelBrowser;
+use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
+use Symfony\Component\Console\Input\ArrayInput;
+use Symfony\Component\Console\Output\BufferedOutput;
+use Symfony\Component\HttpKernel\KernelInterface;
+
+/**
+ * Base class for testing Quire extensions.
+ *
+ *     final class ReviewsTest extends ExtensionTestCase
+ *     {
+ *         protected static array $extensions = ['acme-comments', 'acme-reviews'];
+ *
+ *         public function testListsReviews(): void
+ *         {
+ *             $this->setSetting('acme-reviews.per_page', 5);
+ *             $this->client->request('GET', '/reviews');
+ *
+ *             self::assertResponseIsSuccessful();
+ *         }
+ *     }
+ *
+ * Each test class runs a minimal Quire application ({@see TestKernel}) with only the listed extensions
+ * enabled. Before the first test, the test database is created and migrated. Every test runs inside a
+ * database transaction that is rolled back afterwards, so tests can't see each other's data.
+ *
+ * @api
+ */
+abstract class ExtensionTestCase extends WebTestCase
+{
+    /**
+     * IDs of the extensions to enable, including the extensions they require.
+     *
+     * @var list<string>
+     */
+    protected static array $extensions = [];
+
+    /** A browser for the test application; it keeps the same kernel (and transaction) across requests. */
+    protected KernelBrowser $client;
+
+    /** @var array<string, true> Builds whose database is ready, per PHPUnit run */
+    private static array $preparedBuilds = [];
+
+    /**
+     * Composer installed.json to read extensions from. Null uses the project's own; override for fixtures.
+     */
+    protected static function installedJson(): ?string
+    {
+        return null;
+    }
+
+    /**
+     * @param array<mixed> $options
+     */
+    protected static function createKernel(array $options = []): KernelInterface
+    {
+        $environment = $options['environment'] ?? 'test';
+        $debug = $options['debug'] ?? true;
+
+        return new TestKernel(
+            static::$extensions,
+            static::installedJson(),
+            \is_string($environment) ? $environment : 'test',
+            \is_bool($debug) ? $debug : true,
+        );
+    }
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->prepareDatabase();
+
+        $this->client = static::createClient();
+        $this->client->disableReboot();
+
+        $this->connection()->beginTransaction();
+    }
+
+    protected function tearDown(): void
+    {
+        $connection = $this->connection();
+
+        while ($connection->isTransactionActive()) {
+            $connection->rollBack();
+        }
+
+        parent::tearDown();
+    }
+
+    /**
+     * Changes a setting for this test only.
+     */
+    protected function setSetting(string $key, mixed $value): void
+    {
+        $this->settings()->set($key, $value);
+    }
+
+    protected function settings(): Settings
+    {
+        return $this->service(Settings::class);
+    }
+
+    protected function connection(): Connection
+    {
+        return $this->service(Connection::class);
+    }
+
+    protected static function assertExtensionRunning(string $id): void
+    {
+        $resolved = static::getContainer()->get(ExtensionManager::class)->resolve();
+
+        self::assertTrue($resolved->isRunning($id), \sprintf('Extension "%s" is not running.%s', $id, isset($resolved->broken[$id]) ? ' It is enabled, but '.$resolved->broken[$id].'.' : ''));
+    }
+
+    /**
+     * @template T of object
+     *
+     * @param class-string<T> $id
+     *
+     * @return T
+     */
+    protected function service(string $id): object
+    {
+        $service = static::getContainer()->get($id);
+        \assert($service instanceof $id);
+
+        return $service;
+    }
+
+    /**
+     * Creates the test database and runs migrations, once per set of extensions and PHPUnit run.
+     */
+    private function prepareDatabase(): void
+    {
+        $kernel = static::createKernel();
+        $build = $kernel->getCacheDir();
+
+        if (isset(self::$preparedBuilds[$build])) {
+            return;
+        }
+
+        $application = new Application($kernel);
+        $application->setAutoExit(false);
+
+        foreach ([['doctrine:database:create', '--if-not-exists' => true], ['doctrine:migrations:migrate', '--allow-no-migration' => true]] as $command) {
+            $output = new BufferedOutput();
+            $input = new ArrayInput(['command' => $command[0], ...\array_slice($command, 1, preserve_keys: true)]);
+            $input->setInteractive(false);
+
+            if (0 !== $application->run($input, $output)) {
+                throw new \RuntimeException(\sprintf("Preparing the test database failed: \"%s\".\n%s\nCheck that DATABASE_URL points to a PostgreSQL server Quire can create databases on.", $command[0], $output->fetch()));
+            }
+        }
+
+        $kernel->shutdown();
+        self::$preparedBuilds[$build] = true;
+    }
+}
