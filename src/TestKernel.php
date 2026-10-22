@@ -96,6 +96,11 @@ final class TestKernel extends Kernel
 
         $container->extension('twig', ['strict_variables' => true]);
 
+        // Like an application's config/packages/asset_mapper.yaml: the project's own assets/ directory.
+        if (is_dir($this->getProjectDir().'/assets')) {
+            $container->extension('framework', ['asset_mapper' => ['paths' => ['assets/']]]);
+        }
+
         $container->extension('doctrine', [
             'dbal' => [
                 'url' => '%env(resolve:DATABASE_URL)%',
