@@ -66,7 +66,8 @@ final class ExtensionTestCaseTest extends ExtensionTestCase
     public function testCountsDatabaseQueries(): void
     {
         // No posts: the page query only; relations aren't loaded for an empty page.
-        $this->assertQueryCount(1, fn (): \Symfony\Component\DomCrawler\Crawler => $this->client->request('GET', '/_fixture/posts'));
+        // The settings (for the page's language), then the posts with their total.
+        $this->assertQueryCount(2, fn (): \Symfony\Component\DomCrawler\Crawler => $this->client->request('GET', '/_fixture/posts'));
         self::assertSame(3, $this->assertQueryCount(1, fn (): mixed => $this->connection()->fetchOne('SELECT 3')), 'The callback\'s result is returned.');
 
         try {
