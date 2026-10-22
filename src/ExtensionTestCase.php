@@ -32,7 +32,7 @@ use Symfony\Component\HttpKernel\KernelInterface;
  *     }
  *
  * Each test class runs a minimal Quire application ({@see TestKernel}) with only the listed extensions
- * enabled. Before the first test, the test database is created and migrated. Every test runs inside a
+ * enabled, and the theme in $theme if one is set. Before the first test, the test database is created and migrated. Every test runs inside a
  * database transaction that is rolled back afterwards, so tests can't see each other's data.
  *
  * @api
@@ -45,6 +45,12 @@ abstract class ExtensionTestCase extends WebTestCase
      * @var list<string>
      */
     protected static array $extensions = [];
+
+    /**
+     * ID of the site's theme, e.g. to test a theme or how an extension looks in one; null for Quire's
+     * built-in templates.
+     */
+    protected static ?string $theme = null;
 
     /** A browser for the test application; it keeps the same kernel (and transaction) across requests. */
     protected KernelBrowser $client;
@@ -73,6 +79,7 @@ abstract class ExtensionTestCase extends WebTestCase
             static::installedJson(),
             \is_string($environment) ? $environment : 'test',
             \is_bool($debug) ? $debug : true,
+            static::$theme,
         );
     }
 

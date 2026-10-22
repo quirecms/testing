@@ -31,12 +31,14 @@ final class TestKernel extends Kernel
     /**
      * @param list<string> $extensions    IDs of the extensions to enable (required extensions must be listed too)
      * @param string|null  $installedJson Composer installed.json to read extensions from; null for the project's own
+     * @param string|null  $theme         ID of the site's theme; null for Quire's built-in templates
      */
     public function __construct(
         private readonly array $extensions,
         private readonly ?string $installedJson = null,
         string $environment = 'test',
         bool $debug = true,
+        private readonly ?string $theme = null,
     ) {
         parent::__construct($environment, $debug);
     }
@@ -55,7 +57,7 @@ final class TestKernel extends Kernel
     }
 
     /**
-     * One cache directory per set of extensions, so test classes enabling different extensions don't
+     * One cache directory per set of extensions and theme, so test classes using different ones don't
      * share a build.
      */
     public function getCacheDir(): string
@@ -110,6 +112,7 @@ final class TestKernel extends Kernel
             'extensions' => [
                 'pinned' => true,
                 'enabled' => $this->extensions,
+                'theme' => $this->theme,
                 'installed_json' => $this->installedJson ?? TestInstallation::writeInstalledJson($this->getCacheDir()),
             ],
         ]);
@@ -122,6 +125,6 @@ final class TestKernel extends Kernel
 
     private function buildId(): string
     {
-        return substr(hash('xxh128', implode(',', $this->extensions).'|'.$this->installedJson.'|'.$this->environment), 0, 16);
+        return substr(hash('xxh128', implode(',', $this->extensions).'|'.$this->theme.'|'.$this->installedJson.'|'.$this->environment), 0, 16);
     }
 }
