@@ -8,6 +8,7 @@ use Doctrine\Bundle\DoctrineBundle\DoctrineBundle;
 use Quire\QuireBundle;
 use Quire\Testing\Database\QueryLog;
 use Quire\Testing\Database\QueryLogMiddleware;
+use Quire\User\Security\ExtensionAuthenticators;
 use Quire\User\Security\UserChecker;
 use Quire\User\User;
 use Symfony\Bundle\FrameworkBundle\FrameworkBundle;
@@ -108,6 +109,7 @@ final class TestKernel extends Kernel
                 'lazy' => true,
                 'provider' => 'quire_users',
                 'user_checker' => UserChecker::class,
+                'custom_authenticators' => [ExtensionAuthenticators::class],
                 'form_login' => ['login_path' => 'quire_login', 'check_path' => 'quire_login', 'enable_csrf' => true, 'default_target_path' => 'quire_home'],
                 'logout' => ['path' => 'quire_logout', 'target' => 'quire_home', 'enable_csrf' => true],
                 'remember_me' => ['secret' => '%kernel.secret%', 'signature_properties' => ['password']],
