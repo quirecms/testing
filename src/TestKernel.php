@@ -8,6 +8,8 @@ use Doctrine\Bundle\DoctrineBundle\DoctrineBundle;
 use Doctrine\Bundle\MigrationsBundle\DoctrineMigrationsBundle;
 use Doctrine\DBAL\Platforms\PostgreSQLPlatform;
 use Quire\QuireBundle;
+use Quire\Testing\Database\QueryLog;
+use Quire\Testing\Database\QueryLogMiddleware;
 use Symfony\Bundle\FrameworkBundle\FrameworkBundle;
 use Symfony\Bundle\FrameworkBundle\Kernel\MicroKernelTrait;
 use Symfony\Bundle\TwigBundle\TwigBundle;
@@ -105,6 +107,11 @@ final class TestKernel extends Kernel
                 'identity_generation_preferences' => [PostgreSQLPlatform::class => 'identity'],
             ],
         ]);
+
+        // Counts database queries for ExtensionTestCase::assertQueryCount().
+        $services = $container->services();
+        $services->set(QueryLog::class);
+        $services->set(QueryLogMiddleware::class)->autowire()->autoconfigure();
 
         $container->extension('quire', [
             'extensions' => [

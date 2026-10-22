@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Quire\Testing\Tests;
 
+use PHPUnit\Framework\AssertionFailedError;
 use PHPUnit\Framework\Attributes\Depends;
 use Quire\Testing\ExtensionTestCase;
 use Quire\Testing\TestInstallation;
@@ -60,5 +61,19 @@ final class ExtensionTestCaseTest extends ExtensionTestCase
         $this->client->request('GET', '/_quire/health');
 
         self::assertResponseIsSuccessful();
+    }
+
+    public function testCountsDatabaseQueries(): void
+    {
+        // No posts: the page query only; relations aren't loaded for an empty page.
+        $this->assertQueryCount(1, fn (): \Symfony\Component\DomCrawler\Crawler => $this->client->request('GET', '/_fixture/posts'));
+        self::assertSame(3, $this->assertQueryCount(1, fn (): mixed => $this->connection()->fetchOne('SELECT 3')), 'The callback\'s result is returned.');
+
+        try {
+            $this->assertQueryCount(0, fn (): mixed => $this->connection()->fetchOne('SELECT 1'));
+            self::fail('A wrong count fails.');
+        } catch (AssertionFailedError $e) {
+            self::assertStringContainsString("Expected 0 database queries, got 1:\n- SELECT 1", $e->getMessage());
+        }
     }
 }

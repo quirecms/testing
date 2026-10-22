@@ -7,6 +7,7 @@ namespace Quire\Testing;
 use Doctrine\DBAL\Connection;
 use Quire\Extension\ExtensionManager;
 use Quire\Settings\Settings;
+use Quire\Testing\Database\QueryLog;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
@@ -114,6 +115,34 @@ abstract class ExtensionTestCase extends WebTestCase
     protected function connection(): Connection
     {
         return $this->service(Connection::class);
+    }
+
+    /**
+     * Runs the callback and asserts how many database queries it made, e.g. that a listing loads its
+     * relations in batches instead of once per item (N+1). Returns what the callback returns.
+     *
+     *     $this->assertQueryCount(2, fn () => $this->client->request('GET', '/reviews'));
+     *
+     * @template T
+     *
+     * @param callable(): T $callback
+     *
+     * @return T
+     */
+    protected function assertQueryCount(int $expected, callable $callback, string $message = ''): mixed
+    {
+        $log = $this->service(QueryLog::class);
+        $log->start();
+
+        try {
+            $result = $callback();
+        } finally {
+            $queries = $log->stop();
+        }
+
+        self::assertCount($expected, $queries, ('' === $message ? '' : $message."\n").\sprintf("Expected %d database queries, got %d:\n%s", $expected, \count($queries), implode("\n", array_map(static fn (string $sql): string => '- '.$sql, $queries))));
+
+        return $result;
     }
 
     protected static function assertExtensionRunning(string $id): void
