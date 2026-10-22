@@ -100,10 +100,18 @@ final class TestKernel extends Kernel
 
         $container->extension('twig', ['strict_variables' => true]);
 
-        // Quire's users, as an application's security.yaml uses them; cheap password hashing for speed.
+        // Quire's users and sign-in page, as an application's security.yaml sets them up; cheap password
+        // hashing for speed.
         $container->extension('security', [
             'password_hashers' => [User::class => ['algorithm' => 'auto', 'cost' => 4, 'time_cost' => 3, 'memory_cost' => 10]],
-            'firewalls' => ['main' => ['lazy' => true, 'provider' => 'quire_users', 'user_checker' => UserChecker::class]],
+            'firewalls' => ['main' => [
+                'lazy' => true,
+                'provider' => 'quire_users',
+                'user_checker' => UserChecker::class,
+                'form_login' => ['login_path' => 'quire_login', 'check_path' => 'quire_login', 'enable_csrf' => true, 'default_target_path' => 'quire_home'],
+                'logout' => ['path' => 'quire_logout', 'target' => 'quire_home', 'enable_csrf' => true],
+                'remember_me' => ['secret' => '%kernel.secret%', 'signature_properties' => ['password']],
+            ]],
         ]);
 
         // Like an application's config/packages/asset_mapper.yaml: the project's own assets/ directory.
