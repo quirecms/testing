@@ -8,8 +8,11 @@ use Doctrine\Bundle\DoctrineBundle\DoctrineBundle;
 use Quire\QuireBundle;
 use Quire\Testing\Database\QueryLog;
 use Quire\Testing\Database\QueryLogMiddleware;
+use Quire\User\Security\UserChecker;
+use Quire\User\User;
 use Symfony\Bundle\FrameworkBundle\FrameworkBundle;
 use Symfony\Bundle\FrameworkBundle\Kernel\MicroKernelTrait;
+use Symfony\Bundle\SecurityBundle\SecurityBundle;
 use Symfony\Bundle\TwigBundle\TwigBundle;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 use Symfony\Component\HttpKernel\Kernel;
@@ -48,6 +51,7 @@ final class TestKernel extends Kernel
         yield new FrameworkBundle();
         yield new TwigBundle();
         yield new DoctrineBundle();
+        yield new SecurityBundle();
         yield new QuireBundle();
     }
 
@@ -95,6 +99,12 @@ final class TestKernel extends Kernel
         ]);
 
         $container->extension('twig', ['strict_variables' => true]);
+
+        // Quire's users, as an application's security.yaml uses them; cheap password hashing for speed.
+        $container->extension('security', [
+            'password_hashers' => [User::class => ['algorithm' => 'auto', 'cost' => 4, 'time_cost' => 3, 'memory_cost' => 10]],
+            'firewalls' => ['main' => ['lazy' => true, 'provider' => 'quire_users', 'user_checker' => UserChecker::class]],
+        ]);
 
         // Like an application's config/packages/asset_mapper.yaml: the project's own assets/ directory.
         if (is_dir($this->getProjectDir().'/assets')) {
