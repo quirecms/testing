@@ -14,7 +14,6 @@
     "require": {
         "php": ">=8.5",
         "doctrine/doctrine-bundle": "^3.0",
-        "doctrine/doctrine-migrations-bundle": "^4.0",
         "phpunit/phpunit": "^13.4",
         "quire/core": "0.1.x-dev",
         "symfony/browser-kit": "^8.1",

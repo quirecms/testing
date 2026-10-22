@@ -34,13 +34,13 @@ final class ExtensionTestCaseTest extends ExtensionTestCase
 
     public function testMigratesTheTestDatabase(): void
     {
-        self::assertTrue($this->connection()->createSchemaManager()->tablesExist(['quire_fixture_hello_visit']));
+        self::assertTrue(null !== $this->connection()->fetchOne('SELECT to_regclass(?)', ['quire.quire_fixture_hello_visit']));
     }
 
     public function testSettingsApplyToRequests(): void
     {
         $this->setSetting('quire-fixture-hello.greeting', 'Howdy');
-        $this->connection()->insert('quire_fixture_hello_visit', ['name' => 'Ada']);
+        $this->connection()->insert('quire.quire_fixture_hello_visit', ['name' => 'Ada']);
 
         $this->client->request('GET', '/_fixture/hello/Ada');
         self::assertSelectorTextSame('h1', 'Howdy, Ada!');
@@ -53,7 +53,7 @@ final class ExtensionTestCaseTest extends ExtensionTestCase
     public function testEachTestStartsWithACleanDatabase(): void
     {
         self::assertSame('Hello', $this->settings()->getString('quire-fixture-hello.greeting'));
-        self::assertEquals(0, $this->connection()->fetchOne('SELECT COUNT(*) FROM quire_fixture_hello_visit'));
+        self::assertEquals(0, $this->connection()->fetchOne('SELECT COUNT(*) FROM quire.quire_fixture_hello_visit'));
     }
 
     public function testCoreRoutesAreAvailable(): void

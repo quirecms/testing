@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace Quire\Testing;
 
 use Doctrine\Bundle\DoctrineBundle\DoctrineBundle;
-use Doctrine\Bundle\MigrationsBundle\DoctrineMigrationsBundle;
-use Doctrine\DBAL\Platforms\PostgreSQLPlatform;
 use Quire\QuireBundle;
 use Quire\Testing\Database\QueryLog;
 use Quire\Testing\Database\QueryLogMiddleware;
@@ -48,7 +46,6 @@ final class TestKernel extends Kernel
         yield new FrameworkBundle();
         yield new TwigBundle();
         yield new DoctrineBundle();
-        yield new DoctrineMigrationsBundle();
         yield new QuireBundle();
     }
 
@@ -101,10 +98,6 @@ final class TestKernel extends Kernel
             'dbal' => [
                 'url' => '%env(resolve:DATABASE_URL)%',
                 'dbname_suffix' => '_test',
-            ],
-            'orm' => [
-                'naming_strategy' => 'doctrine.orm.naming_strategy.underscore',
-                'identity_generation_preferences' => [PostgreSQLPlatform::class => 'identity'],
             ],
         ]);
 

@@ -182,7 +182,7 @@ abstract class ExtensionTestCase extends WebTestCase
         $application = new Application($kernel);
         $application->setAutoExit(false);
 
-        foreach ([['doctrine:database:create', '--if-not-exists' => true], ['doctrine:migrations:migrate', '--allow-no-migration' => true]] as $command) {
+        foreach ([['doctrine:database:create', '--if-not-exists' => true], ['quire:migrations:migrate', '--allow-no-migration' => true]] as $command) {
             $output = new BufferedOutput();
             $input = new ArrayInput(['command' => $command[0], ...\array_slice($command, 1, preserve_keys: true)]);
             $input->setInteractive(false);
