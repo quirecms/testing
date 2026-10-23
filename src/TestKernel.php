@@ -151,6 +151,8 @@ final class TestKernel extends Kernel
         $services->set(QueryLogMiddleware::class)->autowire()->autoconfigure();
 
         $container->extension('quire', [
+            // Files that tests store stay out of the project's own storage.
+            'storage' => ['root' => '%kernel.project_dir%/var/quire-test-storage'],
             'extensions' => [
                 'pinned' => true,
                 'enabled' => $this->extensions,
