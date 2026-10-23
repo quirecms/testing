@@ -97,6 +97,9 @@ final class TestKernel extends Kernel
             'handle_all_throwables' => true,
             'php_errors' => ['log' => true],
             'session' => ['storage_factory_id' => 'session.storage.factory.mock_file'],
+            'mailer' => ['dsn' => 'null://null'],
+            // The site's address, e.g. for links in emails.
+            'router' => ['default_uri' => 'http://localhost'],
         ]);
 
         $container->extension('twig', ['strict_variables' => true]);
