@@ -152,6 +152,16 @@ abstract class ExtensionTestCase extends WebTestCase
         return $result;
     }
 
+    /**
+     * Runs the background jobs waiting in the queue, as a worker would (see {@see JobRunner}).
+     *
+     * @return int How many jobs ran
+     */
+    protected function runJobs(int $limit = 100): int
+    {
+        return JobRunner::run(static::getContainer(), $limit);
+    }
+
     protected static function assertExtensionRunning(string $id): void
     {
         $resolved = static::getContainer()->get(ExtensionManager::class)->resolve();
