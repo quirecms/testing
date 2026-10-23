@@ -81,6 +81,20 @@ final class TestKernel extends Kernel
     }
 
     /**
+     * Without the config directory, so FrameworkBundle doesn't write this kernel's config reference over the
+     * project's config/reference.php.
+     *
+     * @return array<mixed>
+     */
+    protected function getKernelParameters(): array
+    {
+        $parameters = parent::getKernelParameters();
+        unset($parameters['.kernel.config_dir']);
+
+        return $parameters;
+    }
+
+    /**
      * A distinct class name per build, so several builds can be loaded in one PHPUnit run.
      */
     protected function getContainerClass(): string
