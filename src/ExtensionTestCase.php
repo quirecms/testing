@@ -199,7 +199,8 @@ abstract class ExtensionTestCase extends WebTestCase
         $application = new Application($kernel);
         $application->setAutoExit(false);
 
-        foreach ([['doctrine:database:create', '--if-not-exists' => true], ['quire:migrations:migrate', '--allow-no-migration' => true]] as $command) {
+        // The npm packages of the extensions (see "extra.quire.importmap"), for pages that load their scripts.
+        foreach ([['doctrine:database:create', '--if-not-exists' => true], ['quire:migrations:migrate', '--allow-no-migration' => true], ['importmap:install']] as $command) {
             $output = new BufferedOutput();
             $input = new ArrayInput(['command' => $command[0], ...\array_slice($command, 1, preserve_keys: true)]);
             $input->setInteractive(false);
