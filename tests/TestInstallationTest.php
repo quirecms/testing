@@ -30,7 +30,8 @@ final class TestInstallationTest extends TestCase
         self::assertIsString($core['install-path']);
         self::assertSame(realpath(TestInstallation::projectDir().'/packages/core'), realpath($targetDir.'/'.$core['install-path']));
 
-        // The monorepo itself is a project, not an extension, so nothing is added for it.
-        self::assertSame([], new InstalledExtensions($path)->all());
+        // The monorepo itself is a project, not an extension, so nothing is added for it; the extensions it
+        // installs are there.
+        self::assertSame(['quire-admin'], array_keys(new InstalledExtensions($path)->all()));
     }
 }
