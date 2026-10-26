@@ -20,6 +20,8 @@ final class ReviewsTest extends Quire\Testing\ExtensionTestCase
 }
 ```
 
+Helpers sign people in (`signIn('editor')`), create content in any state (`content('post', 'Hello')->published()->create()`) and changes waiting for review (`changes($post)->submitted()->create()`), and show what the audit log recorded during a test. `AdminTestCase` adds helpers for admin pages, and `quire:demo:seed` fills a site with a realistic demo, "Tournament News".
+
 See [testing your extension](https://github.com/quirecms/framework/blob/main/docs/extensions.md#testing-your-extension).
 
 License: MIT.

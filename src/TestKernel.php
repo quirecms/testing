@@ -8,6 +8,8 @@ use Doctrine\Bundle\DoctrineBundle\DoctrineBundle;
 use Quire\QuireBundle;
 use Quire\Testing\Database\QueryLog;
 use Quire\Testing\Database\QueryLogMiddleware;
+use Quire\Testing\Demo\DemoSite;
+use Quire\Testing\Demo\SeedDemoCommand;
 use Quire\User\Security\ExtensionAuthenticators;
 use Quire\User\Security\UserChecker;
 use Quire\User\User;
@@ -149,6 +151,9 @@ final class TestKernel extends Kernel
         $services = $container->services();
         $services->set(QueryLog::class);
         $services->set(QueryLogMiddleware::class)->autowire()->autoconfigure();
+        // The demo site of the admin's designs, for tests that need a realistic one.
+        $services->set(DemoSite::class)->autowire()->public();
+        $services->set(SeedDemoCommand::class)->autowire()->autoconfigure();
 
         $container->extension('quire', [
             // Files that tests store stay out of the project's own storage.

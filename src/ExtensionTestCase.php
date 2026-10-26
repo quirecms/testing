@@ -5,9 +5,21 @@ declare(strict_types=1);
 namespace Quire\Testing;
 
 use Doctrine\DBAL\Connection;
+use Quire\Audit\AuditEntry;
+use Quire\Audit\AuditLog;
+use Quire\Content\Content;
+use Quire\Content\ContentWriter;
+use Quire\Content\Revision\PendingRevisionRepository;
+use Quire\Content\Revision\PendingRevisionWriter;
 use Quire\Extension\ExtensionManager;
 use Quire\Settings\Settings;
 use Quire\Testing\Database\QueryLog;
+use Quire\Testing\Factory\ChangesBuilder;
+use Quire\Testing\Factory\ContentBuilder;
+use Quire\User\CreateUser;
+use Quire\User\User;
+use Quire\User\UserRepository;
+use Quire\User\UserWriter;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
@@ -39,6 +51,9 @@ use Symfony\Component\HttpKernel\KernelInterface;
  */
 abstract class ExtensionTestCase extends WebTestCase
 {
+    /** The password of the users that {@see signIn()} and {@see CreateUser()} create */
+    public const string PASSWORD = 'correct-horse-42';
+
     /**
      * IDs of the extensions to enable, including the extensions they require.
      *
@@ -54,6 +69,9 @@ abstract class ExtensionTestCase extends WebTestCase
 
     /** A browser for the test application; it keeps the same kernel (and transaction) across requests. */
     protected KernelBrowser $client;
+
+    /** Audit entries with a greater ID were recorded during this test */
+    private string $auditMark = '';
 
     /** @var array<string, true> Builds whose database is ready, per PHPUnit run */
     private static array $preparedBuilds = [];
@@ -93,6 +111,9 @@ abstract class ExtensionTestCase extends WebTestCase
         $this->client->disableReboot();
 
         $this->connection()->beginTransaction();
+        // IDs are time-ordered UUIDs: entries of earlier tests that committed have smaller ones.
+        $mark = $this->connection()->fetchOne('SELECT uuidv7()');
+        $this->auditMark = \is_string($mark) ? $mark : '';
     }
 
     protected function tearDown(): void
@@ -167,6 +188,91 @@ abstract class ExtensionTestCase extends WebTestCase
         $resolved = static::getContainer()->get(ExtensionManager::class)->resolve();
 
         self::assertTrue($resolved->isRunning($id), \sprintf('Extension "%s" is not running.%s', $id, isset($resolved->broken[$id]) ? ' It is enabled, but '.$resolved->broken[$id].'.' : ''));
+    }
+
+    /**
+     * Signs the browser in, as the given user or, with a role's name, as a user named after it with that
+     * role ("editor" signs in as "Editor"), created when there's none. Others signed in before are
+     * signed out.
+     *
+     *     $this->signIn('editor');
+     *     $this->signIn($grace);
+     */
+    protected function signIn(User|string $who = 'admin'): User
+    {
+        $this->signOut();
+
+        if ($who instanceof User) {
+            $this->client->loginUser($who, 'main');
+
+            return $who;
+        }
+
+        $user = $this->service(UserRepository::class)->findByUsername($who) ?? $this->createUser(ucfirst($who), [$who], username: $who);
+        $crawler = $this->client->request('GET', '/login');
+        $this->client->submit($crawler->filter('input[name="_username"]')->closest('form')?->form(['_username' => $user->username, '_password' => self::PASSWORD]) ?? throw new \LogicException('The sign-in page has no sign-in form.'));
+
+        return $user;
+    }
+
+    protected function signOut(): void
+    {
+        $this->client->getCookieJar()->clear();
+    }
+
+    /**
+     * @param list<string> $roles
+     * @param string|null  $password Null for a user without one, e.g. who was invited
+     */
+    protected function createUser(string $name, array $roles = [], ?string $username = null, ?string $email = null, ?string $password = self::PASSWORD): User
+    {
+        $username ??= strtolower((string) preg_replace('/[^a-z0-9]+/i', '-', $name));
+
+        return $this->service(UserWriter::class)->create(new CreateUser($name, $email ?? $username.'@example.com', $username, $password, $roles));
+    }
+
+    /**
+     * A content item to create, e.g. `$this->content('post', 'Hello')->published()->create()`.
+     */
+    protected function content(string $type, string $title): ContentBuilder
+    {
+        return new ContentBuilder($this->service(ContentWriter::class), $type, $title);
+    }
+
+    /**
+     * Changes to a published item that aren't live yet, e.g. `$this->changes($post)->title('New')->submitted()->create()`.
+     */
+    protected function changes(Content $item): ChangesBuilder
+    {
+        return new ChangesBuilder($this->service(PendingRevisionWriter::class), $this->service(PendingRevisionRepository::class), $item);
+    }
+
+    /**
+     * What the audit log recorded during this test, oldest first.
+     *
+     * @return list<AuditEntry>
+     */
+    protected function audited(?string $action = null, ?string $subjectId = null): array
+    {
+        $ids = $this->connection()->fetchFirstColumn(
+            'SELECT id FROM quire.audit_entry WHERE id > ? AND (?::text IS NULL OR action = ?) AND (?::text IS NULL OR subject_id = ?) ORDER BY id',
+            [$this->auditMark, $action, $action, $subjectId, $subjectId],
+        );
+        $log = $this->service(AuditLog::class);
+
+        return array_values(array_filter(array_map(static fn (mixed $id): ?AuditEntry => \is_string($id) ? $log->get($id) : null, $ids)));
+    }
+
+    /**
+     * Asserts that the action was recorded during this test, and returns its latest entry.
+     */
+    protected function assertAudited(string $action, ?string $subjectId = null, string $message = ''): AuditEntry
+    {
+        $entries = $this->audited($action, $subjectId);
+        $recorded = array_map(static fn (AuditEntry $entry): string => $entry->action, $this->audited());
+        self::assertNotEmpty($entries, ('' === $message ? '' : $message."\n").\sprintf('"%s" wasn\'t recorded%s. Recorded: %s.', $action, null === $subjectId ? '' : ' for '.$subjectId, [] === $recorded ? 'nothing' : implode(', ', $recorded)));
+
+        return $entries[\count($entries) - 1];
     }
 
     /**
