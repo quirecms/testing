@@ -35,7 +35,7 @@ abstract class AdminTestCase extends ExtensionTestCase
      */
     protected static function formToken(Crawler $page): string
     {
-        $token = $page->filter('input[name="_token"]');
+        $token = $page->filter('main input[name="_token"]');
         self::assertGreaterThan(0, $token->count(), 'The page has no form with a CSRF token.');
 
         return (string) $token->first()->attr('value');
@@ -46,7 +46,7 @@ abstract class AdminTestCase extends ExtensionTestCase
      */
     protected static function assertNotice(string $type, string $text): void
     {
-        self::assertSelectorTextContains('.notice--'.$type, $text);
+        self::assertSelectorTextContains('.q-notice--'.$type, $text);
     }
 
     /**
@@ -54,7 +54,7 @@ abstract class AdminTestCase extends ExtensionTestCase
      */
     protected static function assertCommandShown(Crawler $page, string $command): void
     {
-        $shown = $page->filter('.command__text')->each(static fn (Crawler $node): string => $node->text(normalizeWhitespace: false));
+        $shown = $page->filter('.q-command__text')->each(static fn (Crawler $node): string => $node->text(normalizeWhitespace: false));
         self::assertContains($command, array_merge(...array_map(static fn (string $text): array => explode("\n", $text), $shown)), [] === $shown ? 'No command is shown.' : 'Shown: '.implode(' | ', $shown));
     }
 }
