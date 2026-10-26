@@ -23,6 +23,7 @@ use Quire\User\UserWriter;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
+use Symfony\Component\BrowserKit\Cookie;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Output\BufferedOutput;
 use Symfony\Component\HttpKernel\KernelInterface;
@@ -218,6 +219,32 @@ abstract class ExtensionTestCase extends WebTestCase
     protected function signOut(): void
     {
         $this->client->getCookieJar()->clear();
+    }
+
+    /**
+     * A CSRF token for the browser's session, to post to a form that no page shows, e.g.
+     * `$this->client->request('POST', $url, ['_token' => $this->csrfToken('quire_view_as')])`.
+     */
+    protected function csrfToken(string $id): string
+    {
+        $factory = static::getContainer()->get('session.factory');
+        $session = $factory->createSession();
+        $cookie = $this->client->getCookieJar()->get($session->getName());
+
+        if ($cookie instanceof Cookie) {
+            $session->setId($cookie->getValue());
+        }
+
+        $session->start();
+        $token = bin2hex(random_bytes(16));
+        $session->set('_csrf/'.$id, $token);
+        $session->save();
+
+        if (!$cookie instanceof Cookie) {
+            $this->client->getCookieJar()->set(new Cookie($session->getName(), $session->getId()));
+        }
+
+        return $token;
     }
 
     /**
