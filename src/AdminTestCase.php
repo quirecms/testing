@@ -35,7 +35,8 @@ abstract class AdminTestCase extends ExtensionTestCase
      */
     protected static function formToken(Crawler $page): string
     {
-        $token = $page->filter('main input[name="_token"]');
+        // Not a preference's, e.g. the density's next to a list's heading.
+        $token = $page->filter('main form:not([action*="/preferences/"]) input[name="_token"]');
         self::assertGreaterThan(0, $token->count(), 'The page has no form with a CSRF token.');
 
         return (string) $token->first()->attr('value');

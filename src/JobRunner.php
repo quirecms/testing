@@ -6,6 +6,10 @@ namespace Quire\Testing;
 
 use Quire\Jobs\Job;
 use Symfony\Component\DependencyInjection\ContainerInterface;
+use Symfony\Component\EventDispatcher\EventDispatcherInterface;
+use Symfony\Component\Messenger\Event\WorkerMessageFailedEvent;
+use Symfony\Component\Messenger\Event\WorkerMessageHandledEvent;
+use Symfony\Component\Messenger\Event\WorkerMessageReceivedEvent;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\ConsumedByWorkerStamp;
 use Symfony\Component\Messenger\Stamp\ReceivedStamp;
@@ -27,6 +31,8 @@ final class JobRunner
         // Tests use the test container, which has private services too.
         $transport = $container->get('messenger.transport.'.Job::TRANSPORT); // @phpstan-ignore symfonyContainer.privateService
         $bus = $container->get(MessageBusInterface::class); // @phpstan-ignore symfonyContainer.privateService
+        // As a worker tells listeners what it does, e.g. the audit log, which records "in a job".
+        $events = $container->get(EventDispatcherInterface::class); // @phpstan-ignore symfonyContainer.privateService
 
         if ($transport instanceof SyncTransport) {
             throw new \LogicException(\sprintf('Jobs run as soon as they\'re dispatched (the transport "%s" isn\'t a queue), so none wait.', Job::TRANSPORT));
@@ -41,13 +47,18 @@ final class JobRunner
             }
 
             foreach ($envelopes as $envelope) {
+                $events->dispatch(new WorkerMessageReceivedEvent($envelope, Job::TRANSPORT));
+
                 try {
                     $bus->dispatch($envelope->with(new ReceivedStamp(Job::TRANSPORT), new ConsumedByWorkerStamp()));
                 } catch (\Throwable $e) {
                     $transport->reject($envelope);
+                    $events->dispatch(new WorkerMessageFailedEvent($envelope, Job::TRANSPORT, $e));
 
                     throw $e;
                 }
+
+                $events->dispatch(new WorkerMessageHandledEvent($envelope, Job::TRANSPORT));
 
                 $transport->ack($envelope);
                 ++$ran;
