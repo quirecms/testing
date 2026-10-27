@@ -19,15 +19,13 @@ use Quire\User\UserRepository;
  */
 final class DemoSiteTest extends ExtensionTestCase
 {
-    private const string NOW = '2026-10-26 10:30:00 Europe/Skopje';
-
     #[\Override]
     protected static array $extensions = ['quire-admin'];
 
     public function testTheSiteOfTheMockups(): void
     {
         $this->emptySite();
-        $created = $this->service(DemoSite::class)->seed(now: new \DateTimeImmutable(self::NOW));
+        $created = $this->service(DemoSite::class)->seed(now: $this->now());
 
         self::assertSame(['people' => 15, 'pages' => 6, 'posts' => 54], array_diff_key($created, ['activity' => 0]));
         self::assertGreaterThan(50, $created['activity']);
@@ -45,7 +43,7 @@ final class DemoSiteTest extends ExtensionTestCase
         $content = $this->service(ContentRepository::class);
         $scheduled = $content->query('post')->withoutVisibilityScope()->where('status', '=', Status::SCHEDULED)->orderBy('published_at', 'asc')->get();
         self::assertSame(['Final ticket sales', 'Referee list', 'Match day 1', 'Results'], array_map(static fn (\Quire\Content\Content $item): string => $item->title, $scheduled));
-        self::assertSame('2026-10-27 09:00', $scheduled[0]->publishedAt?->setTimezone(new \DateTimeZone('Europe/Skopje'))->format('Y-m-d H:i'));
+        self::assertSame($this->now()->modify('+1 day')->format('Y-m-d').' 09:00', $scheduled[0]->publishedAt?->setTimezone(new \DateTimeZone('Europe/Skopje'))->format('Y-m-d H:i'));
         self::assertGreaterThan(0, $content->query('post')->where('locale', '=', 'de')->count(), 'Posts in German too.');
 
         $waiting = $this->service(PendingRevisionRepository::class)->awaitingReview();
@@ -57,7 +55,7 @@ final class DemoSiteTest extends ExtensionTestCase
         self::assertSame([], array_values(array_filter($activity, static fn (AuditEntry $entry): bool => null === $entry->actorId)), 'Every entry has a person; the seeding\'s own entries are gone.');
         $times = array_map(static fn (AuditEntry $entry): \DateTimeImmutable => $entry->occurredAt, $activity);
         self::assertNotEmpty($times);
-        self::assertGreaterThan(new \DateTimeImmutable('2026-09-25'), min($times), 'A month of activity.');
+        self::assertGreaterThan($this->now()->modify('-32 days'), min($times), 'A month of activity.');
     }
 
     public function testTheSameSeedAndTimeGiveTheSameSite(): void
@@ -67,7 +65,7 @@ final class DemoSiteTest extends ExtensionTestCase
 
         foreach ([1, 2] as $run) {
             $this->connection()->beginTransaction();
-            $this->service(DemoSite::class)->seed(now: new \DateTimeImmutable(self::NOW));
+            $this->service(DemoSite::class)->seed(now: $this->now());
             $titles[$run] = $this->connection()->fetchFirstColumn("SELECT title || ' ' || status || ' ' || coalesce(to_char(published_at, 'YYYY-MM-DD HH24:MI'), '') FROM quire.content ORDER BY title, published_at");
             $this->connection()->rollBack();
         }
@@ -92,5 +90,14 @@ final class DemoSiteTest extends ExtensionTestCase
     {
         $this->connection()->executeStatement('DELETE FROM quire.content');
         $this->connection()->executeStatement("DELETE FROM quire.app_user WHERE username IN ('ada', 'noor', 'grace', 'kim', 'lin') OR email LIKE '%@example.org'");
+    }
+
+    /**
+     * The start of today: before the real time, as what the demo publishes must be, and with what it
+     * schedules (from tomorrow) after it, as the content writer checks. A fixed date would soon be past.
+     */
+    private function now(): \DateTimeImmutable
+    {
+        return new \DateTimeImmutable('today', new \DateTimeZone('Europe/Skopje'));
     }
 }
