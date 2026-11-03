@@ -71,6 +71,8 @@ final class DemoSite
 
     private \DateTimeImmutable $now;
 
+    private DemoCalendar $calendar;
+
     /** @var array<string, User> By username */
     private array $people = [];
 
@@ -122,6 +124,7 @@ final class DemoSite
 
         $this->random = new \Random\Randomizer(new \Random\Engine\Xoshiro256StarStar($seed));
         $this->now = $now ?? new \DateTimeImmutable();
+        $this->calendar = new DemoCalendar($this->now, new \DateTimeZone('Europe/Skopje'));
         $this->people = [];
         $this->live = [];
         $mark = $this->scalar($this->connection->fetchOne('SELECT uuidv7()'));
@@ -213,12 +216,12 @@ final class DemoSite
 
     private function addPosts(bool $full): int
     {
-        // The posts the mockups show, around now.
-        $spring = $this->publish($this->create('post', 'Spring draw: all groups', "Sixteen teams, four groups, one evening in the old town hall.\n\n![The stage](https://tournament.example/images/draw-stage.jpg)\n\n## Group A\n\nHosts **FC Harbour** open against Northside on Friday at 18:00.\n\nGroup D: TBC", 'grace', excerpt: 'All 16 teams and their groups, drawn on Friday.'), $this->ago(60 * 48));
-        $this->publish($this->create('post', 'Group stage recap', self::SENTENCES[0]."\n\n".self::SENTENCES[2], 'grace', excerpt: 'What happened in the group stage.'), $this->ago(120));
-        $this->publish($this->create('post', 'Draw ceremony', self::SENTENCES[6], 'ada', excerpt: 'The ceremony, in pictures.'), $this->ago(300));
-        $venueUpdate = $this->publish($this->create('post', 'Venue update', 'Match day 2 moves to '.self::VENUES[1].'.', 'kim', excerpt: 'A change of venue.'), $this->ago(60 * 24 * 3));
-        $venueGuide = $this->publish($this->create('post', 'Venue guide', self::SENTENCES[7]."\n\n".self::SENTENCES[8], 'kim', excerpt: 'Getting to the grounds.'), $this->ago(60 * 24 * 6));
+        // The posts the mockups show, around now (and in this month: see DemoCalendar).
+        $spring = $this->publish($this->create('post', 'Spring draw: all groups', "Sixteen teams, four groups, one evening in the old town hall.\n\n![The stage](https://tournament.example/images/draw-stage.jpg)\n\n## Group A\n\nHosts **FC Harbour** open against Northside on Friday at 18:00.\n\nGroup D: TBC", 'grace', excerpt: 'All 16 teams and their groups, drawn on Friday.'), $this->calendar->recent(60 * 48));
+        $this->publish($this->create('post', 'Group stage recap', self::SENTENCES[0]."\n\n".self::SENTENCES[2], 'grace', excerpt: 'What happened in the group stage.'), $this->calendar->recent(120));
+        $this->publish($this->create('post', 'Draw ceremony', self::SENTENCES[6], 'ada', excerpt: 'The ceremony, in pictures.'), $this->calendar->recent(300));
+        $venueUpdate = $this->publish($this->create('post', 'Venue update', 'Match day 2 moves to '.self::VENUES[1].'.', 'kim', excerpt: 'A change of venue.'), $this->calendar->recent(60 * 24 * 3));
+        $venueGuide = $this->publish($this->create('post', 'Venue guide', self::SENTENCES[7]."\n\n".self::SENTENCES[8], 'kim', excerpt: 'Getting to the grounds.'), $this->calendar->recent(60 * 24 * 6));
         $this->create('post', 'Referee assignments explained', "How referees are chosen for each round.\n\nSee [the rules of 2019](/blog/rules-2019) for the old process.", 'ada');
         $this->create('post', 'How seeding works', self::SENTENCES[6]."\n\n".self::SENTENCES[1], 'grace', excerpt: 'Pots, rankings and the draw.');
 
@@ -242,10 +245,9 @@ final class DemoSite
             }
 
             if ($i < $live) {
-                // Spread over two years, more of them recently.
-                $this->publish($item, $this->ago((int) (60 * 24 * 730 * ($i / max(1, $live)) ** 1.6) + 60 * 24));
+                $this->publish($item, $this->calendar->spread($i, $live));
             } elseif ($i >= $live + $drafts) {
-                $item = $this->publish($item, $this->ago(60 * 24 * 600));
+                $item = $this->publish($item, $this->calendar->monthsAgo(20, $i));
                 $this->content->transition($item->id, $item->version, Status::ARCHIVE);
             }
         }
