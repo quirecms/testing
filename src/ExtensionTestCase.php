@@ -17,6 +17,7 @@ use Quire\Testing\Database\QueryLog;
 use Quire\Testing\Factory\ChangesBuilder;
 use Quire\Testing\Factory\ContentBuilder;
 use Quire\User\CreateUser;
+use Quire\User\Security\Confirmation;
 use Quire\User\User;
 use Quire\User\UserRepository;
 use Quire\User\UserWriter;
@@ -26,6 +27,7 @@ use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\BrowserKit\Cookie;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Output\BufferedOutput;
+use Symfony\Component\HttpFoundation\Session\SessionInterface;
 use Symfony\Component\HttpKernel\KernelInterface;
 
 /**
@@ -205,6 +207,8 @@ abstract class ExtensionTestCase extends WebTestCase
 
         if ($who instanceof User) {
             $this->client->loginUser($who, 'main');
+            // As signing in on the sign-in page does
+            $this->confirmedAgo(0);
 
             return $who;
         }
@@ -222,10 +226,34 @@ abstract class ExtensionTestCase extends WebTestCase
     }
 
     /**
+     * Says the browser's user confirmed it's them that many seconds ago (see {@see Confirmation}), or
+     * never with null: to test what asks for it. Signing in confirms.
+     */
+    protected function confirmedAgo(?int $seconds): void
+    {
+        $this->inSession(static function (SessionInterface $session) use ($seconds): void {
+            null === $seconds ? $session->remove('quire.confirmed_at') : $session->set('quire.confirmed_at', time() - $seconds);
+        });
+    }
+
+    /**
      * A CSRF token for the browser's session, to post to a form that no page shows, e.g.
      * `$this->client->request('POST', $url, ['_token' => $this->csrfToken('quire_view_as')])`.
      */
     protected function csrfToken(string $id): string
+    {
+        $token = bin2hex(random_bytes(16));
+        $this->inSession(static fn (SessionInterface $session) => $session->set('_csrf/'.$id, $token));
+
+        return $token;
+    }
+
+    /**
+     * Changes the browser's session, as the next request will find it.
+     *
+     * @param \Closure(SessionInterface): void $change
+     */
+    private function inSession(\Closure $change): void
     {
         $factory = static::getContainer()->get('session.factory');
         $session = $factory->createSession();
@@ -236,15 +264,12 @@ abstract class ExtensionTestCase extends WebTestCase
         }
 
         $session->start();
-        $token = bin2hex(random_bytes(16));
-        $session->set('_csrf/'.$id, $token);
+        $change($session);
         $session->save();
 
         if (!$cookie instanceof Cookie) {
             $this->client->getCookieJar()->set(new Cookie($session->getName(), $session->getId()));
         }
-
-        return $token;
     }
 
     /**
