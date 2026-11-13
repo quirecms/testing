@@ -32,6 +32,6 @@ final class TestInstallationTest extends TestCase
 
         // The monorepo itself is a project, not an extension, so nothing is added for it; the extensions it
         // installs are there.
-        self::assertSame(['quire-admin', 'quire-privacy'], array_keys(new InstalledExtensions($path)->all()));
+        self::assertSame(['quire-admin', 'quire-analytics', 'quire-privacy'], array_keys(new InstalledExtensions($path)->all()));
     }
 }
